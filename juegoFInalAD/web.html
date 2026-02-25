@@ -1,0 +1,694 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Stickman Hook</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #05070a;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+      }
+      canvas {
+        display: block;
+        box-shadow:
+          0 0 50px rgba(0, 255, 255, 0.25),
+          0 0 100px rgba(0, 255, 255, 0.08);
+      }
+    </style>
+  </head>
+  <body>
+    <script>
+      const WORLD_W = 4000;
+      const WORLD_H = 2000;
+      const GAME_W = 1200;
+      const GAME_H = 650;
+      const ZOOM = 0.4;
+      const UI_SCALE = 1 / ZOOM;
+      const TOTAL_DIAMONDS = 8;
+
+      function makeButton(
+        scene,
+        x,
+        y,
+        w,
+        h,
+        label,
+        fontSize,
+        baseColor,
+        hoverColor,
+        strokeColor,
+      ) {
+        const btn = scene.add
+          .rectangle(x, y, w, h, baseColor)
+          .setStrokeStyle(3, strokeColor)
+          .setInteractive({ useHandCursor: true });
+        scene.add
+          .text(x, y, label, {
+            fontSize,
+            fontStyle: "bold",
+            fill: "#ffffff",
+            shadow: {
+              offsetX: 1,
+              offsetY: 1,
+              color: "#000",
+              blur: 4,
+              fill: true,
+            },
+          })
+          .setOrigin(0.5);
+        btn.on("pointerover", () => btn.setFillStyle(hoverColor));
+        btn.on("pointerout", () => btn.setFillStyle(baseColor));
+        return btn;
+      }
+
+      class MenuScene extends Phaser.Scene {
+        constructor() {
+          super({ key: "MenuScene" });
+        }
+        preload() {
+          this.load.audio("audio_fondo", "assets/musicaFondoPhaser.mp3");
+        }
+        create() {
+          if (!this.sound.get("audio_fondo")) {
+            const musica = this.sound.add("audio_fondo", {
+              loop: true,
+              volume: 0.5,
+            });
+            this.input.once("pointerdown", () => {
+              if (!musica.isPlaying) musica.play();
+            });
+          }
+          this.cameras.main.setBackgroundColor("#0a0e14");
+          this.add.circle(GAME_W / 2, GAME_H / 2, 420, 0x00ffff, 0.04);
+          this.add
+            .text(GAME_W / 2, 130, "STICKMAN", {
+              fontSize: "72px",
+              fontStyle: "bold",
+              fill: "#e0f7fa",
+              stroke: "#006064",
+              strokeThickness: 10,
+              shadow: { color: "#00ffff", blur: 22, stroke: true, fill: true },
+            })
+            .setOrigin(0.5);
+          this.add
+            .text(GAME_W / 2, 195, "H O O K", {
+              fontSize: "32px",
+              fontStyle: "bold",
+              fill: "#00e5ff",
+              stroke: "#006064",
+              strokeThickness: 5,
+              shadow: { color: "#00bcd4", blur: 12, stroke: true, fill: true },
+            })
+            .setOrigin(0.5);
+          const instructions = [
+            "Clic en pared → lanzar gancho",
+            "W / S → acortar / alargar cuerda",
+            "ESC → pausar",
+          ];
+          instructions.forEach((txt, i) => {
+            this.add
+              .text(GAME_W / 2, 260 + i * 28, txt, {
+                fontSize: "17px",
+                fill: "#80deea",
+                alpha: 0.8,
+              })
+              .setOrigin(0.5);
+          });
+          const startBtn = makeButton(
+            this,
+            GAME_W / 2,
+            445,
+            280,
+            72,
+            "ENTRAR",
+            "30px",
+            0x00838f,
+            0x00aabf,
+            0x00ffff,
+          );
+          this.tweens.add({
+            targets: startBtn,
+            scaleX: 1.04,
+            scaleY: 1.04,
+            duration: 1100,
+            yoyo: true,
+            repeat: -1,
+            ease: "Sine.easeInOut",
+          });
+          startBtn.on("pointerdown", () =>
+            this.scene.start("GameScene", {
+              score: 0,
+              collectedIds: [],
+              lives: 3,
+            }),
+          );
+        }
+      }
+
+      class PauseScene extends Phaser.Scene {
+        constructor() {
+          super({ key: "PauseScene" });
+        }
+        create() {
+          this.add.rectangle(
+            GAME_W / 2,
+            GAME_H / 2,
+            GAME_W,
+            GAME_H,
+            0x05070a,
+            0.87,
+          );
+          this.add
+            .text(GAME_W / 2, 118, "PAUSA", {
+              fontSize: "62px",
+              fontStyle: "bold",
+              fill: "#00ffff",
+              shadow: { color: "#00ffff", blur: 12, fill: true },
+            })
+            .setOrigin(0.5);
+          const gs = this.scene.get("GameScene");
+          if (gs) {
+            const hearts =
+              "♥".repeat(gs.lives) + "♡".repeat(Math.max(0, 3 - gs.lives));
+            this.add
+              .text(
+                GAME_W / 2,
+                193,
+                `Cristales: ${gs.score}/${TOTAL_DIAMONDS}   Vidas: ${hearts}`,
+                { fontSize: "21px", fill: "#b2ebf2" },
+              )
+              .setOrigin(0.5);
+          }
+          makeButton(
+            this,
+            GAME_W / 2,
+            295,
+            290,
+            58,
+            "REANUDAR",
+            "24px",
+            0x00838f,
+            0x00aabf,
+            0x00ffff,
+          ).on("pointerdown", () => {
+            this.scene.resume("GameScene");
+            this.scene.stop();
+          });
+          makeButton(
+            this,
+            GAME_W / 2,
+            385,
+            290,
+            58,
+            "ABANDONAR",
+            "24px",
+            0x8e0000,
+            0xb00000,
+            0xff5252,
+          ).on("pointerdown", () => {
+            this.scene.stop("GameScene");
+            this.scene.start("MenuScene");
+          });
+        }
+      }
+
+      class WinScene extends Phaser.Scene {
+        constructor() {
+          super({ key: "WinScene" });
+        }
+        create(data) {
+          const finalScore = data?.score ?? TOTAL_DIAMONDS;
+          this.cameras.main.setBackgroundColor("#020508");
+          this.add.circle(GAME_W / 2, 230, 320, 0x00ffff, 0.12);
+          this.add
+            .text(GAME_W / 2, 175, "¡CUEVA SUPERADA!", {
+              fontSize: "58px",
+              fontStyle: "bold",
+              fill: "#ffffff",
+              stroke: "#00ffff",
+              strokeThickness: 8,
+              shadow: { color: "#00ffff", blur: 22, stroke: true, fill: true },
+            })
+            .setOrigin(0.5);
+          this.add
+            .text(
+              GAME_W / 2,
+              260,
+              `Has recolectado ${finalScore} de ${TOTAL_DIAMONDS} cristales`,
+              { fontSize: "23px", fill: "#b2ebf2" },
+            )
+            .setOrigin(0.5);
+          const replayBtn = makeButton(
+            this,
+            GAME_W / 2,
+            390,
+            260,
+            62,
+            "JUGAR DE NUEVO",
+            "22px",
+            0x00838f,
+            0x00aabf,
+            0x00ffff,
+          );
+          replayBtn.on("pointerdown", () => this.scene.start("MenuScene"));
+        }
+      }
+
+      class GameScene extends Phaser.Scene {
+        constructor() {
+          super({ key: "GameScene" });
+        }
+
+        create(data) {
+          this.score = data.score || 0;
+          this.collectedIds = data.collectedIds || [];
+          this.lives = data.lives !== undefined ? data.lives : 3;
+          this.isGrappling = false;
+          this.isTransitioning = false;
+          this.rope = null;
+          this.ropeTargetPos = { x: 0, y: 0 };
+          this.ropeProgress = 0;
+          this.graphics = this.add.graphics().setDepth(10);
+
+          this._setupInput();
+          this._setupWorld();
+          this._createBackground();
+          this._createWalls();
+          this._createDiamonds();
+          this._createPlayer();
+          this._setupCamera();
+          this._createHUD();
+          this._setupCollisions();
+        }
+
+        _setupInput() {
+          this.cursors = this.input.keyboard.createCursorKeys();
+          this.keyW = this.input.keyboard.addKey("W");
+          this.keyS = this.input.keyboard.addKey("S");
+          this.keyEsc = this.input.keyboard.addKey("ESC");
+        }
+
+        _setupWorld() {
+          this.matter.world.setBounds(0, 0, WORLD_W, WORLD_H);
+          this.cameras.main.setBounds(0, 0, WORLD_W, WORLD_H);
+          this.cameras.main.setZoom(ZOOM);
+          this.cameras.main.setBackgroundColor("#0a0e14");
+        }
+
+        _createBackground() {
+          for (let i = 0; i < 40; i++) {
+            this.add
+              .circle(
+                Phaser.Math.Between(0, WORLD_W),
+                Phaser.Math.Between(0, WORLD_H),
+                Phaser.Math.Between(50, 300),
+                0x111824,
+                Phaser.Math.FloatBetween(0.1, 0.4),
+              )
+              .setDepth(0);
+          }
+        }
+
+        _createWalls() {
+          this.walls = [];
+          this.movingWalls = [];
+
+          const mapData = [
+            { x: 1000, y: 50, w: 2000, h: 150, vis: true },
+            { x: 3200, y: 50, w: 1800, h: 150, vis: true },
+            { x: WORLD_W / 2, y: WORLD_H - 50, w: WORLD_W, h: 100, vis: true },
+            {
+              x: 800,
+              y: 1200,
+              w: 400,
+              h: 100,
+              vis: true,
+              moving: true,
+              range: 400,
+            },
+            {
+              x: 2500,
+              y: 800,
+              w: 500,
+              h: 100,
+              vis: true,
+              moving: true,
+              range: 600,
+            },
+            { x: 1500, y: 500, w: 200, h: 100, vis: true, fragile: true },
+            { x: 3200, y: 1300, w: 200, h: 100, vis: true, fragile: true },
+            { x: 500, y: 600, w: 300, h: 500, vis: true },
+            { x: 2000, y: 600, w: 200, h: 800, vis: true },
+            { x: 2600, y: 1500, w: 500, h: 100, vis: true },
+            { x: 1500, y: 1800, w: 800, h: 100, vis: true },
+          ];
+
+          mapData.forEach((data) => {
+            const wall = this.matter.add.rectangle(
+              data.x,
+              data.y,
+              data.w,
+              data.h,
+              {
+                isStatic: true,
+                label: "wall",
+              },
+            );
+            wall.rectWidth = data.w;
+            wall.rectHeight = data.h;
+
+            if (data.vis) {
+              const color = data.fragile
+                ? 0xff5252
+                : data.moving
+                  ? 0x00e5ff
+                  : 0x1a212c;
+              wall.view = this.add
+                .rectangle(data.x, data.y, data.w, data.h, color)
+                .setStrokeStyle(8, data.fragile ? 0x8e0000 : 0x334155)
+                .setDepth(1);
+            }
+
+            if (data.moving) {
+              wall.startX = data.x;
+              wall.range = data.range;
+              this.movingWalls.push(wall);
+            }
+            if (data.fragile) {
+              wall.isFragile = true;
+              wall.breakTimer = null;
+            }
+
+            this.walls.push(wall);
+          });
+        }
+
+        _createDiamonds() {
+          const points = [
+            { id: 1, x: 300, y: 350 },
+            { id: 2, x: 1200, y: 550 },
+            { id: 3, x: 1650, y: 1000 },
+            { id: 4, x: 2400, y: 300 },
+            { id: 5, x: 2800, y: 1200 },
+            { id: 6, x: 3700, y: 400 },
+            { id: 7, x: 3600, y: 1600 },
+            { id: 8, x: 2000, y: 1500 },
+          ];
+          points.forEach(({ id, x, y }) => {
+            if (this.collectedIds.includes(id)) return;
+            const d = this.matter.add.circle(x, y, 30, {
+              isStatic: true,
+              isSensor: true,
+              label: "diamond",
+            });
+            d.diamondId = id;
+            d.view = this.add.container(x, y).setDepth(2);
+            d.view.add([
+              this.add.circle(0, 0, 42, 0x00ffff, 0.28),
+              this.add
+                .polygon(0, 0, [0, -35, 20, 0, 0, 35, -20, 0], 0x00e5ff)
+                .setStrokeStyle(3, 0xffffff),
+            ]);
+            this.tweens.add({
+              targets: d.view,
+              y: y - 16,
+              duration: 1500,
+              yoyo: true,
+              repeat: -1,
+              ease: "Sine.easeInOut",
+            });
+          });
+        }
+
+        _createPlayer() {
+          this.player = this.matter.add.circle(1500, 1000, 25, {
+            frictionAir: 0.001,
+            friction: 0.01,
+            restitution: 0.3,
+            label: "player",
+          });
+          const g = this.add.graphics().setDepth(5);
+          g.lineStyle(5, 0x00ffff, 1);
+          g.fillStyle(0x000000, 0.8);
+          g.strokeCircle(0, -12, 10);
+          g.fillCircle(0, -12, 10);
+          g.beginPath();
+          g.moveTo(0, -2);
+          g.lineTo(0, 15);
+          g.moveTo(-18, 5);
+          g.lineTo(18, 5);
+          g.moveTo(0, 15);
+          g.lineTo(-12, 30);
+          g.moveTo(0, 15);
+          g.lineTo(12, 30);
+          g.strokePath();
+          this.player.sprite = g;
+        }
+
+        _setupCamera() {
+          this.cameras.main.startFollow(this.player.sprite, false, 0.1, 0.1);
+        }
+
+        _createHUD() {
+          const toWorldX = (sx) => (sx - GAME_W / 2) / ZOOM + GAME_W / 2;
+          const toWorldY = (sy) => (sy - GAME_H / 2) / ZOOM + GAME_H / 2;
+          this.scoreText = this.add
+            .text(
+              toWorldX(20),
+              toWorldY(22),
+              `CRISTALES: ${this.score}/${TOTAL_DIAMONDS}`,
+              {
+                fontSize: "32px",
+                fill: "#00ffff",
+                fontStyle: "bold",
+                shadow: { color: "#000", blur: 3, fill: true },
+              },
+            )
+            .setScrollFactor(0)
+            .setScale(UI_SCALE)
+            .setDepth(20);
+          this.livesText = this.add
+            .text(
+              toWorldX(20),
+              toWorldY(64),
+              `VIDAS: ${"♥".repeat(this.lives)}`,
+              {
+                fontSize: "28px",
+                fill: "#ff5252",
+                fontStyle: "bold",
+                shadow: { color: "#000", blur: 3, fill: true },
+              },
+            )
+            .setScrollFactor(0)
+            .setScale(UI_SCALE)
+            .setDepth(20);
+        }
+
+        _setupCollisions() {
+          this.input.on("pointerdown", this._onPointerDown, this);
+          this.input.on("pointerup", this._onPointerUp, this);
+          this.matter.world.on("collisionstart", (e) => {
+            if (this.isTransitioning) return;
+            e.pairs.forEach(({ bodyA, bodyB }) => {
+              const labels = [bodyA.label, bodyB.label];
+              if (labels.includes("player") && labels.includes("wall"))
+                this._onHitWall();
+              if (labels.includes("player") && labels.includes("diamond")) {
+                const dBody = bodyA.label === "diamond" ? bodyA : bodyB;
+                this._collectDiamond(dBody);
+              }
+            });
+          });
+        }
+
+        _onPointerDown(pointer) {
+          if (
+            this.scene.isActive("PauseScene") ||
+            this.isGrappling ||
+            this.isTransitioning
+          )
+            return;
+          const wp = pointer.positionToCamera(this.cameras.main);
+          let targetBody = null;
+          this.walls.forEach((b) => {
+            if (this.matter.containsPoint(b, wp.x, wp.y)) targetBody = b;
+          });
+          if (!targetBody) return;
+
+          if (targetBody.isFragile) {
+            targetBody.breakTimer = this.time.delayedCall(3000, () => {
+              this._onPointerUp();
+              if (targetBody.view) targetBody.view.destroy();
+              this.walls = this.walls.filter((w) => w !== targetBody);
+              this.matter.world.remove(targetBody);
+            });
+            this.tweens.add({
+              targets: targetBody.view,
+              alpha: 0.3,
+              duration: 300,
+              yoyo: true,
+              repeat: 9,
+            });
+          }
+
+          this.isGrappling = true;
+          const impactX = wp.x;
+          const impactY = wp.y;
+          this.ropeTargetPos = { x: impactX, y: impactY };
+          const dist = Phaser.Math.Distance.Between(
+            this.player.position.x,
+            this.player.position.y,
+            impactX,
+            impactY,
+          );
+          this.ropeProgress = 0;
+          this.tweens.add({
+            targets: this,
+            ropeProgress: 1,
+            duration: 60,
+            onComplete: () => {
+              if (!this.isGrappling || this.isTransitioning) return;
+              this.rope = this.matter.add.constraint(
+                this.player,
+                targetBody,
+                dist,
+                0.05,
+                {
+                  pointB: {
+                    x: impactX - targetBody.position.x,
+                    y: impactY - targetBody.position.y,
+                  },
+                },
+              );
+            },
+          });
+        }
+
+        _onPointerUp() {
+          if (this.rope) {
+            const target = this.rope.bodyB;
+            if (target.breakTimer) {
+              target.breakTimer.remove();
+              if (target.view) target.view.setAlpha(1);
+            }
+            this.matter.world.removeConstraint(this.rope);
+          }
+          this.rope = null;
+          this.isGrappling = false;
+        }
+
+        _onHitWall() {
+          if (this.isTransitioning) return;
+          this.isTransitioning = true;
+          this.lives--;
+
+          this.cameras.main.flash(350, 255, 0, 0);
+
+          let nextScore = this.score;
+          let nextCollected = this.collectedIds;
+          let nextLives = this.lives;
+
+          if (this.lives <= 0) {
+            nextScore = 0;
+            nextCollected = [];
+            nextLives = 3;
+          }
+
+          this.time.delayedCall(750, () => {
+            this.scene.restart({
+              score: nextScore,
+              collectedIds: nextCollected,
+              lives: nextLives,
+            });
+          });
+        }
+
+        _collectDiamond(dBody) {
+          if (!dBody.view) return;
+          dBody.view.destroy();
+          this.collectedIds.push(dBody.diamondId);
+          this.matter.world.remove(dBody);
+          this.score++;
+          this.scoreText.setText(`CRISTALES: ${this.score}/${TOTAL_DIAMONDS}`);
+          if (this.score >= TOTAL_DIAMONDS) {
+            this.isTransitioning = true;
+            this.scene.start("WinScene", { score: this.score });
+          }
+        }
+
+        update(time) {
+          if (Phaser.Input.Keyboard.JustDown(this.keyEsc)) {
+            this.scene.pause();
+            this.scene.launch("PauseScene");
+          }
+
+          this.movingWalls.forEach((wall) => {
+            const newX = wall.startX + Math.sin(time / 1000) * wall.range;
+            this.matter.body.setPosition(wall, { x: newX, y: wall.position.y });
+            if (wall.view) wall.view.setPosition(newX, wall.position.y);
+          });
+
+          this.player.sprite.setPosition(
+            this.player.position.x,
+            this.player.position.y,
+          );
+          this.player.sprite.rotation = this.player.angle;
+          this.graphics.clear();
+          if (!this.isGrappling || this.isTransitioning) return;
+          this.graphics.lineStyle(6, 0x00e5ff, 0.8);
+          if (this.rope) {
+            const ax = this.rope.bodyB.position.x + this.rope.pointB.x;
+            const ay = this.rope.bodyB.position.y + this.rope.pointB.y;
+            this.graphics.lineBetween(
+              this.player.position.x,
+              this.player.position.y,
+              ax,
+              ay,
+            );
+            if (this.keyW.isDown && this.rope.length > 50)
+              this.rope.length -= 3;
+            if (this.keyS.isDown && this.rope.length < 1500)
+              this.rope.length += 3;
+          } else {
+            const currX =
+              this.player.position.x +
+              (this.ropeTargetPos.x - this.player.position.x) *
+                this.ropeProgress;
+            const currY =
+              this.player.position.y +
+              (this.ropeTargetPos.y - this.player.position.y) *
+                this.ropeProgress;
+            this.graphics.lineBetween(
+              this.player.position.x,
+              this.player.position.y,
+              currX,
+              currY,
+            );
+          }
+        }
+      }
+
+      const config = {
+        type: Phaser.AUTO,
+        width: GAME_W,
+        height: GAME_H,
+        physics: {
+          default: "matter",
+          matter: { gravity: { y: 0.2 }, enableSleeping: false, debug: false },
+        },
+        scene: [MenuScene, GameScene, PauseScene, WinScene],
+      };
+      new Phaser.Game(config);
+    </script>
+  </body>
+</html>
