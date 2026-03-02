@@ -71,6 +71,7 @@
         return btn;
       }
 
+      // ESCENA MENU
       class MenuScene extends Phaser.Scene {
         constructor() {
           super({ key: "MenuScene" });
@@ -124,6 +125,7 @@
               })
               .setOrigin(0.5);
           });
+          // BOTON START
           const startBtn = makeButton(
             this,
             GAME_W / 2,
@@ -145,6 +147,9 @@
             repeat: -1,
             ease: "Sine.easeInOut",
           });
+
+          // BOTON START PULSADO
+
           startBtn.on("pointerdown", () =>
             this.scene.start("GameScene", {
               score: 0,
@@ -154,7 +159,7 @@
           );
         }
       }
-
+      // ESCENA PAUSA
       class PauseScene extends Phaser.Scene {
         constructor() {
           super({ key: "PauseScene" });
@@ -222,6 +227,8 @@
         }
       }
 
+      // ESCENA VICTORIA
+
       class WinScene extends Phaser.Scene {
         constructor() {
           super({ key: "WinScene" });
@@ -263,6 +270,8 @@
           replayBtn.on("pointerdown", () => this.scene.start("MenuScene"));
         }
       }
+
+      // ESCENA JUEGO
 
       class GameScene extends Phaser.Scene {
         constructor() {
@@ -393,6 +402,8 @@
           });
         }
 
+        // DIAMANTES QUE HAY QUE RECOLECTAR
+
         _createDiamonds() {
           const points = [
             { id: 1, x: 300, y: 350 },
@@ -429,7 +440,7 @@
             });
           });
         }
-
+        // CREACION DEL JUGADOR
         _createPlayer() {
           this.player = this.matter.add.circle(1500, 1000, 25, {
             frictionAir: 0.001,
@@ -454,10 +465,12 @@
           g.strokePath();
           this.player.sprite = g;
         }
-
+        // SEGUIMIENETO CAMARA AL PLAYER
         _setupCamera() {
           this.cameras.main.startFollow(this.player.sprite, false, 0.1, 0.1);
         }
+
+        // HUD
 
         _createHUD() {
           const toWorldX = (sx) => (sx - GAME_W / 2) / ZOOM + GAME_W / 2;
@@ -493,6 +506,8 @@
             .setScale(UI_SCALE)
             .setDepth(20);
         }
+
+        // COLISIONES
 
         _setupCollisions() {
           this.input.on("pointerdown", this._onPointerDown, this);
@@ -587,6 +602,8 @@
           this.isGrappling = false;
         }
 
+        // GOLPE PARED
+
         _onHitWall() {
           if (this.isTransitioning) return;
           this.isTransitioning = true;
@@ -612,6 +629,8 @@
             });
           });
         }
+
+        // COGER DIAMANTE
 
         _collectDiamond(dBody) {
           if (!dBody.view) return;
